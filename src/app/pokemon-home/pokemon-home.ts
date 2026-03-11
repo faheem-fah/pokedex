@@ -21,9 +21,11 @@ import { lastValueFrom } from 'rxjs';
           <p style="font-size: 0.8rem; color: #999;">Updating catalog view...</p>
         </div>
       } @else {
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; margin: 0 auto; max-width: 1200px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto;">
           @for (p of pokemonList; track p.id) {
-            <div style="background: white; border-radius: 15px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+            <div [routerLink]="['/pokemon', p.name]" 
+                 style="background: white; border-radius: 15px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); cursor: pointer; transition: transform 0.2s;">
+              
               <img [src]="p.sprites?.other?.['official-artwork']?.front_default" 
                    style="width: 130px; height: 130px;" [alt]="p.name">
               
@@ -38,8 +40,6 @@ import { lastValueFrom } from 'rxjs';
                 }
               </div>
             </div>
-          } @empty {
-            <p>No Pokémon found in this range.</p>
           }
         </div>
 
@@ -48,9 +48,7 @@ import { lastValueFrom } from 'rxjs';
                   style="padding: 10px 20px; border-radius: 8px; cursor: pointer; background: #333; color: white; border: none;">
             Previous
           </button>
-          
           <span style="font-weight: bold;">Page {{ (offset / 20) + 1 }}</span>
-          
           <button (click)="changePage(20)" [disabled]="loading" 
                   style="padding: 10px 20px; border-radius: 8px; cursor: pointer; background: #333; color: white; border: none;">
             Next
@@ -67,43 +65,31 @@ export class PokemonHomeComponent implements OnInit {
 
   constructor(private http: HttpClient, private cdr: ChangeDetectorRef) {}
 
-  ngOnInit() {
-    this.fetchData();
-  }
+  ngOnInit() { this.fetchData(); }
 
   async fetchData() {
     this.loading = true;
-    this.pokemonList = []; 
-    this.cdr.detectChanges(); 
-    
-    // Fixed: Removed backslashes to allow proper variable interpolation
+    this.cdr.detectChanges();
     const url = `https://pokeapi.co/api/v2/pokemon/?offset=${this.offset}&limit=20`;
-    
     try {
       const res: any = await lastValueFrom(this.http.get(url));
-      
-      const detailPromises = res.results.map((p: any) => 
+      const details = await Promise.all(res.results.map((p: any) => 
         lastValueFrom(this.http.get(p.url)).catch(() => null)
-      );
-      
-      const details = await Promise.all(detailPromises);
+      ));
       this.pokemonList = details.filter(p => p !== null);
-      
     } catch (err) {
       console.error("Fetch failed:", err);
     } finally {
       setTimeout(() => {
-        this.loading = false; 
-        this.cdr.detectChanges(); 
+        this.loading = false;
+        this.cdr.detectChanges();
       }, 0);
     }
   }
 
   changePage(step: number) {
-    const newOffset = this.offset + step;
-    // Basic safety check to prevent negative offsets
-    if (newOffset >= 0) {
-      this.offset = newOffset;
+    if (this.offset + step >= 0) {
+      this.offset += step;
       this.fetchData();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
